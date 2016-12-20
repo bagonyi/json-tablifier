@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>JSON Tablifier</title>
+
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+              integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+              crossorigin="anonymous">
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"
+                integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="
+                crossorigin="anonymous"></script>
+
+        <script>
+            // http://stackoverflow.com/a/19101235/637552
+
+            JSON.flatten = function (data) {
+                var result = {};
+
+                function recurse(cur, prop) {
+                    if (Object(cur) !== cur) {
+                        result[prop] = cur;
+                    } else if (Array.isArray(cur)) {
+                        for (var i = 0, l = cur.length; i < l; i++)
+                            recurse(cur[i], prop + "[" + i + "]");
+                        if (l == 0)
+                            result[prop] = [];
+                    } else {
+                        var isEmpty = true;
+                        for (var p in cur) {
+                            isEmpty = false;
+                            recurse(cur[p], prop ? prop + "." + p : p);
+                        }
+                        if (isEmpty && prop)
+                            result[prop] = {};
+                    }
+                }
+
+                recurse(data, "");
+                return result;
+            };
+
+            JSON.unflatten = function (data) {
+                if (Object(data) !== data || Array.isArray(data))
+                    return data;
+                var regex = /\.?([^.\[\]]+)|\[(\d+)\]/g,
+                    resultholder = {};
+                for (var p in data) {
+                    var cur = resultholder,
+                        prop = "",
+                        m;
+                    while (m = regex.exec(p)) {
+                        cur = cur[prop] || (cur[prop] = (m[2] ? [] : {}));
+                        prop = m[2] || m[1];
+                    }
+                    cur[prop] = data[p];
+                }
+                return resultholder[""] || resultholder;
+            };
+        </script>
+    </head>
+    <body>
+        <div class="container">
+            <div class="row">
+                <h1>JSON Tablifier 🐶</h1>
+                <br>
+                <form class="form-horizontal">
+                    <div class="form-group">
+                        <label for="json" class="col-sm-1 control-label">JSON</label>
+                        <div class="col-sm-10">
+                            <textarea id="json" class="form-control" rows="12">
+{
+    "menu": {
+        "id": "file",
+        "value": "File",
+        "popup": {
+            "menuitem": [
+                {
+                    "value": "New",
+                    "onclick": "CreateNewDoc()"
+                },
+                {
+                    "value": "Open",
+                    "onclick": "OpenDoc()"
+                },
+                {
+                    "value": "Close",
+                    "onclick": "CloseDoc()"
+                }
+            ]
+        }
+    }
+}</textarea>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="table" class="col-sm-1 control-label">Table</label>
+                        <div class="col-sm-10">
+                            <textarea id="table" class="form-control" rows="12"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-sm-offset-1 col-sm-11">
+                            <small>Hint: IntelliJ can reformat tables in Gherkin files (Code / Reformat code)</small>
+                            <br><br>
+                            <button id="json2table" class="btn btn-primary">JSON ➔ Table</button>
+                            <button id="table2json" class="btn btn-primary">Table ➔ JSON</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            var $jsonTextArea = $("textarea#json"),
+                $tableTextArea = $("textarea#table");
+
+            $("#json2table").on("click", function () {
+                var flattened,
+                    tableText = "";
+
+                if ($jsonTextArea.val().trim() === "") {
+                    return false;
+                }
+
+                flattened = JSON.flatten(JSON.parse($jsonTextArea.val()));
+
+                $.each(flattened, function (key, value) {
+                    tableText += "| " + key + " | " + value + " |\n";
+                });
+
+                $tableTextArea.val(tableText);
+
+                return false;
+            });
+
+            $("#table2json").on("click", function () {
+                var tableText = $tableTextArea.val();
+
+                if (tableText.trim() === "") {
+                    return false;
+                }
+
+                var flattenedObject = {};
+
+                $.each(tableText.split("\n"), function (key, value) {
+                    if (value.trim() === "") {
+                        return true;
+                    }
+
+                    var tableRow = value.trim().substring(1, value.length - 2);
+                    var tableCells = tableRow.trim().split("|");
+                    flattenedObject[tableCells[0].trim()] = tableCells[1].trim();
+                });
+
+                $jsonTextArea.val(JSON.stringify(JSON.unflatten(flattenedObject), null, 4));
+
+                return false;
+            });
+
+            $("form").on("submit", function () {
+                return false;
+            });
+        </script>
+    </body>
+</html>
